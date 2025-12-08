@@ -39,6 +39,7 @@ async function run() {
     const paymentsCollection = db.collection("payments");
     const reviewsCollection = db.collection("reviews");
     const coursesCollection = db.collection("courses");
+    const tuitionPostsCollection = db.collection("tuitionPosts");
 
     //tuition realeted api niche
     app.get("/users", async (req, res) => {});
@@ -46,6 +47,95 @@ async function run() {
     app.post("/users", async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
+    });
+
+    app.post("/post-new-tuition", async (req, res) => {
+      try {
+        const tuitionPost = req.body;
+
+        // 1. Data Validation (Optional but Recommended)
+        if (
+          !tuitionPost.subject ||
+          !tuitionPost.location ||
+          !tuitionPost.budget
+        ) {
+          return res.status(400).send({ message: "Missing required fields" });
+        }
+
+        // 2. Add necessary server-side fields
+        tuitionPost.createdAt = new Date();
+        tuitionPost.status = "Pending"; // Initial status for admin review
+
+        // 3. Save to MongoDB
+        const result = await tuitionPostsCollection.insertOne(tuitionPost);
+
+        // 4. Send success response with inserted ID
+        res.status(201).send({
+          insertedId: result.insertedId,
+          message: "Tuition post created successfully and is pending approval.",
+        });
+      } catch (error) {
+        console.error("Error creating tuition post:", error);
+        res.status(500).send({
+          message: "Failed to create tuition post.",
+          error: error.message,
+        });
+      }
+    });
+
+    //get tuition post data
+    app.get("/tuition-posts", async (req, res) => {
+      try {
+        const { email } = req.query;
+        const query = {};
+
+        if (email) {
+          query.userEmail = email;
+        }
+
+        const options = { sort: { createdAt: -1 } };
+
+        const cursor = tuitionPostsCollection.find(query, options);
+        const result = await cursor.toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching tuition posts:", error);
+        res.status(500).send({ message: "Failed to fetch tuition posts." });
+      }
+    });
+
+    // update tuition post data
+    app.put("/post-new-tuition/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+        const query = { _id: new ObjectId(id) };
+
+        const updateDoc = {
+          $set: {
+            ...updatedData, // Set all fields from req.body
+            updatedAt: new Date(), // Optional: add update time
+            status: "Pending", // Re-submit for approval after edit
+          },
+        };
+        const result = await tuitionPostsCollection.updateOne(query, updateDoc);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Failed to update post." });
+      }
+    });
+
+    // Delete tuition post data
+    app.delete("/post-new-tuition/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await tuitionPostsCollection.deleteOne(query);
+        res.send(result); // result will contain deletedCount
+      } catch (error) {
+        res.status(500).send({ message: "Failed to delete post." });
+      }
     });
 
     //riders realeted api ************
@@ -235,7 +325,7 @@ async function run() {
       });
 
       console.log(session);
-      res.send({url: session.url})
+      res.send({ url: session.url });
     });
 
     // Stripe payment related API
@@ -321,7 +411,6 @@ async function run() {
 
       res.send({ success: false });
     });
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
