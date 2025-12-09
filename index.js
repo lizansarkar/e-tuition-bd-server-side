@@ -59,20 +59,60 @@ async function run() {
     // };
 
     app.post("/users", async (req, res) => {
+      // Frontend theke pawa data
       const user = req.body;
-      user.role = "user";
-      user.createdAt = new Date();
       const email = user.email;
-      const userExists = await usersCollection.findOne({ email });
 
-      if (userExists) {
-        return res.send({ message: "user exists" });
+      if (!email) {
+        return res
+          .status(400)
+          .send({ message: "Email is missing in request body" });
       }
 
-      const result = await usersCollection.insertOne(user);
-      res.send(result);
+      try {
+        // Check if the user already exists in the database
+        const userExists = await usersCollection.findOne({ email: email });
+
+        if (userExists) {
+          // User already thakle, notun kore save na kore shudhu status 200 diye message pathano
+          return res.send({
+            message: "user exists in database",
+            user: userExists,
+            isNewUser: false,
+          });
+        }
+
+        // New user data object
+        const newUser = {
+          email: email,
+          displayName: user.name || user.displayName, // Register form theke 'name' ba Google theke 'displayName' nawa holo
+          photoURL: user.photoURL || null,
+          phone: user.phone || null,
+          firebaseUID: user.firebaseUID, // Firebase UID save kora holo
+          role: user.role, // Student ba Tutor role save kora holo
+          createdAt: new Date(),
+        };
+
+        // Save new user to MongoDB
+        const result = await usersCollection.insertOne(newUser);
+
+        // Success response
+        res.status(201).send({
+          insertedId: result.insertedId,
+          message: "New user created successfully in database",
+          user: newUser,
+          isNewUser: true,
+        });
+      } catch (error) {
+        console.error("Database save error:", error);
+        res.status(500).send({
+          message: "Failed to save user in database",
+          error: error.message,
+        });
+      }
     });
 
+    //admin realeted all api niche
     // 1. GET: Fetch ALL Users for Admin Management
     app.get("/admin/users", async (req, res) => {
       try {
@@ -82,6 +122,64 @@ async function run() {
       } catch (error) {
         console.error("Error fetching all users:", error);
         res.status(500).send({ message: "Failed to fetch users." });
+      }
+    });
+
+    // Route 1: Get all Pending Tuition Posts for Admin Review
+    app.get("/aprove-posts", async (req, res) => {
+      // Optional: Admin authorization check add kora uchit.
+      // Ekhane shudhu 'Pending' status diye filter kora holo.
+      const query = { status: "Pending" };
+      try {
+        const pendingPosts = await tuitionPostsCollection.find(query).toArray();
+        res.send(pendingPosts);
+      } catch (error) {
+        console.error("Error fetching pending posts:", error);
+        res.status(500).send({
+          message: "Failed to fetch pending posts",
+          error: error.message,
+        });
+      }
+    });
+
+    app.patch("/aprove-posts/:id", async (req, res) => {
+      // Optional: Admin authorization check add kora uchit.
+
+      const postId = req.params.id;
+
+      try {
+        // Validate and convert ID
+        const idQuery = { _id: new ObjectId(postId) };
+
+        // Update document
+        const updateDoc = {
+          $set: {
+            status: "Approved", // Status update kora holo
+            approvedAt: new Date(), // Kono somoy approve holo, sheta record kora holo
+          },
+        };
+
+        const result = await tuitionPostsCollection.updateOne(
+          idQuery,
+          updateDoc
+        );
+
+        if (result.matchedCount === 0) {
+          return res
+            .status(404)
+            .send({ message: "Post not found or already approved." });
+        }
+
+        res.send({
+          message: "Tuition post approved successfully!",
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (error) {
+        console.error("Error approving post:", error);
+        // Invalid ObjectId holeo ekhane dhora porbe
+        res
+          .status(500)
+          .send({ message: "Failed to approve post", error: error.message });
       }
     });
 
@@ -221,10 +319,8 @@ async function run() {
         // Query to fetch only posts approved by Admin
         const query = { status: "Approved" };
 
-        // Optional: Implement Search, Filter, Pagination logic here later
-
         const options = {
-          sort: { createdAt: -1 }, // Latest posts first
+          sort: { createdAt: -1 },
         };
 
         const cursor = tuitionPostsCollection.find(query, options);
