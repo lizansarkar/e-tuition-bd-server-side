@@ -43,7 +43,28 @@ async function run() {
     const applicationsCollection = db.collection("applications");
 
     //tuition realeted api niche
-    app.get("/users", async (req, res) => {});
+    app.get("/all-approved-tuitions", async (req, res) => {
+      try {
+        // Query to fetch only posts approved by Admin
+        const query = { status: "Approved" };
+
+        // Optional: Implement Search, Filter, Pagination logic here later
+
+        const options = {
+          sort: { createdAt: -1 }, // Latest posts first
+        };
+
+        const cursor = tuitionPostsCollection.find(query, options);
+        const result = await cursor.toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching all approved tuition posts:", error);
+        res
+          .status(500)
+          .send({ message: "Failed to fetch approved tuition posts." });
+      }
+    });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
