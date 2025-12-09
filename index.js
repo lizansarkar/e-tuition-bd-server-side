@@ -40,6 +40,7 @@ async function run() {
     const reviewsCollection = db.collection("reviews");
     const coursesCollection = db.collection("courses");
     const tuitionPostsCollection = db.collection("tuitionPosts");
+    const applicationsCollection = db.collection("applications");
 
     //tuition realeted api niche
     app.get("/users", async (req, res) => {});
@@ -49,6 +50,7 @@ async function run() {
       const result = await usersCollection.insertOne(user);
     });
 
+    //post new tuition post data
     app.post("/post-new-tuition", async (req, res) => {
       try {
         const tuitionPost = req.body;
@@ -138,278 +140,135 @@ async function run() {
       }
     });
 
-    //riders realeted api ************
-    app.patch("/riders/:id", async (req, res) => {
-      const status = req.body.status;
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          status: status,
-        },
-      };
-
-      const result = await riderCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
-
-    //add riders
-    app.post("/riders", async (req, res) => {
-      const rider = req.body;
-      rider.status = "pending";
-      rider.createdAt = new Date();
-
-      const result = await riderCollection.insertOne(rider);
-      res.send(result);
-    });
-
-    //get riders
-    app.get("/riders", async (req, res) => {
-      const query = {};
-      if (req.query.status) {
-        query.status = req.query.status;
-      }
-      const cursor = riderCollection.find(query);
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-
-    //user realeted api ************
-    app.get("/users", async (req, res) => {
-      const cursor = userCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-    app.get("/users/:id", async (req, res) => {});
-
-    //create user role
-    app.get("/users/:email/role", async (req, res) => {
-      const email = req.params.email;
-      const query = { email };
-      const user = await userCollection.findOne(query);
-      res.send({ user: user?.role || "user" });
-    });
-
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      user.role = "user";
-      user.createdAt = new Date();
-
-      const email = user.email;
-      const userExists = await userCollection.findOne({ email });
-
-      if (userExists) {
-        return res.send({ message: "user exist" });
-      }
-
-      const result = await userCollection.insertOne(user);
-      res.send(result);
-    });
-
-    // accept user from admin
-    app.patch("/users/:id/role", async (req, res) => {
-      const id = req.params.id;
-      const roleInfo = req.body;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          role: roleInfo.role,
-        },
-      };
-
-      const result = await userCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
-
-    //parcel api here
-    //get parcel data
-    app.get("/parcels", async (req, res) => {
-      const query = {};
-      const { email } = req.query;
-
-      if (email) {
-        query.senderEmail = email;
-      }
-
-      const options = { sort: { createdAt: -1 } };
-
-      const cursor = parcelsCollection.find(query, options);
-      const result = await cursor.toArray();
-
-      res.send(result);
-    });
-
-    //get payment paid or non paid data
-    app.get("/parcels/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await parcelsCollection.findOne(query);
-
-      res.send(result);
-    });
-
-    // add parcel data
-    app.post("/parcels", async (req, res) => {
-      const parcel = req.body;
-      //for time dekhar ar jonne
-      parcel.createdAt = new Date();
-      const result = await parcelsCollection.insertOne(parcel);
-
-      res.send(result);
-    });
-
-    //delte parcel data
-    app.delete("/parcels/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await parcelsCollection.deleteOne(query);
-
-      res.send(result);
-    });
-
-    //stripe payment raleted api
-    app.post("/payment-checkout-session", async (req, res) => {
-      const paymentInfo = req.body;
-      console.log(paymentInfo);
-      const amount = parseInt(paymentInfo.cost) * 100;
-      const session = await stripe.checkout.sessions.create({
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              unit_amount: amount,
-              product_data: {
-                name: `Please pay for: ${paymentInfo.parcelName}`,
-              },
-            },
-            quantity: 2,
-          },
-        ],
-        mode: "payment",
-        metadata: {
-          parcelId: paymentInfo.parcelId,
-        },
-        customer_email: paymentInfo.senderEmail,
-        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-cancelled`,
-      });
-
-      res.send({ url: session.url });
-    });
-
-    app.post("/create-checkout-session", async (req, res) => {
-      const paymentInfo = req.body;
-      const amount = parseInt(paymentInfo.cost) * 100;
-
-      const session = await stripe.checkout.sessions.create({
-        line_items: [
-          {
-            // Provide the exact Price ID (for example, price_1234) of the product you want to sell
-            price_data: {
-              currency: "usd",
-              unit_amount: amount,
-              product_data: {
-                name: paymentInfo.parcelName,
-              },
-            },
-            quantity: 1,
-          },
-        ],
-        customer_email: paymentInfo.senderEmail,
-        mode: "payment",
-        metadata: {
-          parcelId: paymentInfo.parcelId,
-        },
-        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-success`,
-        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-cancelled`,
-      });
-
-      console.log(session);
-      res.send({ url: session.url });
-    });
-
-    // Stripe payment related API
-    app.post("/create-checkout-session", async (req, res) => {
+    //tutor dashboard api
+    app.post("/applications", async (req, res) => {
       try {
-        const paymentInfo = req.body;
+        const applicationData = req.body; // Mandatory data check (should come from frontend modal)
 
-        console.log("Received payment info:", paymentInfo);
-        console.log("Cost value:", paymentInfo.cost);
+        if (
+          !applicationData.tuitionId ||
+          !applicationData.tutorEmail ||
+          !applicationData.expectedSalary
+        ) {
+          return res
+            .status(400)
+            .send({ message: "Missing required application fields." });
+        } // Check if the tutor has already applied to this post
 
-        // Validate cost
-        if (!paymentInfo.cost || isNaN(paymentInfo.cost)) {
-          return res.status(400).send({
-            error: "Invalid cost value",
-            received: paymentInfo.cost,
-          });
-        }
-
-        // Parse and convert to cents
-        const amount = Math.round(parseFloat(paymentInfo.cost) * 100);
-
-        console.log("Calculated amount in cents:", amount);
-
-        // Validate amount
-        if (amount <= 0 || isNaN(amount)) {
-          return res.status(400).send({
-            error: "Amount must be greater than 0",
-            calculatedAmount: amount,
-          });
-        }
-
-        const session = await stripe.checkout.sessions.create({
-          line_items: [
-            {
-              price_data: {
-                currency: "usd",
-                unit_amount: amount,
-                product_data: {
-                  name: paymentInfo.parcelName || "Parcel Delivery",
-                },
-              },
-              quantity: 1,
-            },
-          ],
-          customer_email: paymentInfo.senderEmail,
-          mode: "payment",
-          metadata: {
-            parcelId: paymentInfo.parcelId,
-          },
-          success_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-success`,
-          cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-cancelled`,
+        const existingApplication = await applicationsCollection.findOne({
+          tuitionId: applicationData.tuitionId,
+          tutorEmail: applicationData.tutorEmail,
         });
 
-        console.log("Session created:", session.id);
-        res.send({ url: session.url });
+        if (existingApplication) {
+          return res.status(409).send({
+            message: "You have already applied to this tuition post.",
+          });
+        } // Set initial status and date
+
+        const newApplication = {
+          ...applicationData,
+          tuitionId: new ObjectId(applicationData.tuitionId), // Convert to ObjectId
+          status: "Pending",
+          appliedDate: new Date(),
+        };
+
+        const result = await applicationsCollection.insertOne(newApplication); // OPTIONAL: Increment the appliedTutors count in the tuitionPost
+
+        await tuitionPostsCollection.updateOne(
+          { _id: new ObjectId(applicationData.tuitionId) },
+          { $inc: { appliedTutorsCount: 1 } } // Assuming you have 'appliedTutorsCount' field
+        );
+
+        res.status(201).send(result);
       } catch (error) {
-        console.error("Stripe error:", error);
-        res.status(500).send({
-          error: error.message,
-          details: error.raw?.message,
-        });
+        console.error("Error creating application:", error);
+        res.status(500).send({ message: "Failed to submit application." });
       }
     });
 
-    //update payment details
-    app.patch("/payment-success", async (req, res) => {
-      const sessionId = req.query.session_id;
+    //get tutor data with email diye
+    app.get("/applications/tutor/:email", async (req, res) => {
+      try {
+        const tutorEmail = req.params.email;
+        const query = { tutorEmail: tutorEmail };
 
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log("session retripe", session);
-      if ((session.payment_status = "paid")) {
-        const id = session.metadata.parcelId;
-        const query = { _id: new ObjectId(id) };
-        const update = {
+        const applications = await applicationsCollection
+          .find(query)
+          .sort({ appliedDate: -1 })
+          .toArray(); // Optional: Join with tuitionPostsCollection to get tuition details
+
+        const applicationDetails = await Promise.all(
+          applications.map(async (app) => {
+            const tuitionPost = await tuitionPostsCollection.findOne({
+              _id: new ObjectId(app.tuitionId),
+            }); // Return the application object with embedded tuition post details
+            return { ...app, tuitionDetails: tuitionPost || null };
+          })
+        );
+
+        res.send(applicationDetails);
+      } catch (error) {
+        console.error("Error fetching tutor applications:", error);
+        res.status(500).send({ message: "Failed to fetch applications." });
+      }
+    });
+
+    //uptate tutor data akhan theke
+    app.patch("/applications/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+        const query = { _id: new ObjectId(id), status: "Pending" }; // Only update if Pending
+
+        const updateDoc = {
           $set: {
-            paymentStatus: "paid",
+            // ... apnar existing logic ...
+            qualifications: updatedData.qualifications,
+            experience: updatedData.experience,
+            expectedSalary: updatedData.expectedSalary,
+            updatedAt: new Date(),
           },
         };
 
-        const result = await parcelsCollection.updateOne(query, update);
+        const result = await applicationsCollection.updateOne(query, updateDoc);
         res.send(result);
+      } catch (error) {
+        console.error("Error updating application:", error);
+        res.status(500).send({ message: "Failed to update application." });
       }
+    });
 
-      res.send({ success: false });
+    //delte tutor data akhan theke
+    app.delete("/applications/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id), status: "Pending" }; // Only delete if Pending // First, find the application to get tuitionId before deleting
+
+        const applicationToDelete = await applicationsCollection.findOne(query);
+
+        if (!applicationToDelete) {
+          return res.status(404).send({
+            message:
+              "Application not found or status is not Pending (cannot be deleted).",
+          });
+        }
+
+        const result = await applicationsCollection.deleteOne(query);
+
+        if (result.deletedCount > 0) {
+          // OPTIONAL: Decrement the appliedTutors count in the tuitionPost
+          await tuitionPostsCollection.updateOne(
+            { _id: applicationToDelete.tuitionId },
+            { $inc: { appliedTutorsCount: -1 } }
+          );
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting application:", error);
+        res.status(500).send({ message: "Failed to delete application." });
+      }
     });
 
     // Send a ping to confirm a successful connection
