@@ -58,6 +58,21 @@ async function run() {
     //   }
     // };
 
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      user.role = "user";
+      user.createdAt = new Date();
+      const email = user.email;
+      const userExists = await usersCollection.findOne({ email });
+
+      if (userExists) {
+        return res.send({ message: "user exists" });
+      }
+
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
     // 1. GET: Fetch ALL Users for Admin Management
     app.get("/admin/users", async (req, res) => {
       try {
@@ -222,11 +237,6 @@ async function run() {
           .status(500)
           .send({ message: "Failed to fetch approved tuition posts." });
       }
-    });
-
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      const result = await usersCollection.insertOne(user);
     });
 
     //post new tuition post data
