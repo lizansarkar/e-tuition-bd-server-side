@@ -25,7 +25,6 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
     //create database in mongodb
@@ -41,6 +40,165 @@ async function run() {
     const coursesCollection = db.collection("courses");
     const tuitionPostsCollection = db.collection("tuitionPosts");
     const applicationsCollection = db.collection("applications");
+
+    //admin verify middleware
+    // const verifyAdmin = async (req, res, next) => {
+    //   try {
+    //     const email = req.decoded_email;
+    //     const query = { email };
+    //     const user = await usersCollection.findOne(query);
+
+    //     if (!user || user.role !== "admin") {
+    //       return res.status(403).send({ message: "forbidden access" });
+    //     }
+
+    //     next();
+    //   } catch (error) {
+    //     res.status(500).send({ message: "Internal server error" });
+    //   }
+    // };
+
+    // 1. GET: Fetch ALL Users for Admin Management
+    app.get("/admin/users", async (req, res) => {
+      try {
+        // Optional: Add verifyAdmin middleware here
+        const users = await usersCollection.find().toArray();
+        res.send(users);
+      } catch (error) {
+        console.error("Error fetching all users:", error);
+        res.status(500).send({ message: "Failed to fetch users." });
+      }
+    });
+
+    // 2. PATCH: Update User Role (e.g., Student to Tutor, or Tutor to Admin)
+    app.patch("/admin/users/:id/role", async (req, res) => {
+      try {
+        // Optional: Add verifyAdmin middleware here
+        const id = req.params.id;
+        const { role } = req.body; // New role (e.g., 'tutor', 'student', 'admin')
+
+        if (!role) {
+          return res.status(400).send({ message: "Role is required." });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            role: role,
+          },
+        };
+
+        const result = await usersCollection.updateOne(query, updateDoc);
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating user role:", error);
+        res.status(500).send({ message: "Failed to update user role." });
+      }
+    });
+
+    // 3. DELETE: Delete User Account
+    app.delete("/admin/users/:id", async (req, res) => {
+      try {
+        // Optional: Add verifyAdmin middleware here
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+
+        const result = await usersCollection.deleteOne(query);
+
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: "User not found." });
+        }
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        res.status(500).send({ message: "Failed to delete user." });
+      }
+    });
+
+    //
+    // 4. GET: Fetch ALL Pending Tuition Posts for Admin Review
+    app.get("/admin/tuition-posts/pending", async (req, res) => {
+      try {
+        // Optional: Add verifyAdmin middleware here
+        const query = { status: "Pending" };
+        const posts = await tuitionPostsCollection
+          .find(query)
+          .sort({ createdAt: 1 })
+          .toArray(); // Oldest first
+        res.send(posts);
+      } catch (error) {
+        console.error("Error fetching pending tuition posts:", error);
+        res.status(500).send({ message: "Failed to fetch pending posts." });
+      }
+    });
+
+    // 5. PATCH: Approve or Reject a Tuition Post
+    app.patch("/admin/tuition-posts/:id/status", async (req, res) => {
+      try {
+        // Optional: Add verifyAdmin middleware here
+        const id = req.params.id;
+        const { newStatus } = req.body; // Should be 'Approved' or 'Rejected'
+
+        if (newStatus !== "Approved" && newStatus !== "Rejected") {
+          return res.status(400).send({ message: "Invalid status provided." });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            status: newStatus,
+            reviewedAt: new Date(),
+          },
+        };
+
+        const result = await tuitionPostsCollection.updateOne(query, updateDoc);
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "Tuition post not found." });
+        }
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating tuition post status:", error);
+        res.status(500).send({ message: "Failed to update status." });
+      }
+    });
+
+    // 6. GET: Reports & Analytics (Total Earnings and Transactions)
+    app.get("/admin/reports/earnings", async (req, res) => {
+      try {
+        // Optional: Add verifyAdmin middleware here
+        // 1. Total Earnings Calculation
+        // Assuming 'paymentsCollection' stores successful payments with an 'amount' field
+        const totalEarningsResult = await paymentsCollection
+          .aggregate([
+            {
+              $group: {
+                _id: null,
+                totalAmount: { $sum: "$amount" }, // Replace "amount" with your actual payment field name
+              },
+            },
+          ])
+          .toArray();
+
+        const totalEarnings =
+          totalEarningsResult.length > 0
+            ? totalEarningsResult[0].totalAmount
+            : 0; // 2. Transaction History
+
+        const transactions = await paymentsCollection
+          .find()
+          .sort({ paymentDate: -1 })
+          .toArray();
+
+        res.send({
+          totalEarnings: totalEarnings,
+          transactionHistory: transactions,
+        });
+      } catch (error) {
+        console.error("Error fetching financial reports:", error);
+        res.status(500).send({ message: "Failed to fetch reports." });
+      }
+    });
 
     //tuition realeted api niche
     app.get("/all-approved-tuitions", async (req, res) => {
