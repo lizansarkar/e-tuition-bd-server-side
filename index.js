@@ -118,9 +118,7 @@ async function run() {
       try {
         const email = req.params.email;
 
-        const userCollection = client
-          .db("e-tuition-bd-db")
-          .collection("users");
+        const userCollection = client.db("e-tuition-bd-db").collection("users");
 
         const user = await userCollection.findOne(
           { email: email },
@@ -566,8 +564,8 @@ async function run() {
       }
     });
 
-    //get tutor data with email diye
-    app.get("/applications/tutor/:email", async (req, res) => {
+    // get tutor data with email diye
+    app.get("/tutor/applications/:email", async (req, res) => {
       try {
         const tutorEmail = req.params.email;
         const query = { tutorEmail: tutorEmail };
@@ -575,13 +573,13 @@ async function run() {
         const applications = await applicationsCollection
           .find(query)
           .sort({ appliedDate: -1 })
-          .toArray(); // Optional: Join with tuitionPostsCollection to get tuition details
+          .toArray();
 
         const applicationDetails = await Promise.all(
           applications.map(async (app) => {
             const tuitionPost = await tuitionPostsCollection.findOne({
               _id: new ObjectId(app.tuitionId),
-            }); // Return the application object with embedded tuition post details
+            });
             return { ...app, tuitionDetails: tuitionPost || null };
           })
         );
@@ -590,6 +588,38 @@ async function run() {
       } catch (error) {
         console.error("Error fetching tutor applications:", error);
         res.status(500).send({ message: "Failed to fetch applications." });
+      }
+    });
+
+    //all pending tutor data dekhabo student ar route
+    app.get("/applications", async (req, res) => {
+      try {
+        // Warning: Eita database theke shob applications fetch korche,
+        // kono student filter check kora hocche na.
+        const allApplications = await applicationsCollection
+          .find({}) // Kono query nei, tai shob data fetch hobe
+          .sort({ appliedAt: -1 })
+          .toArray();
+
+        // Final response
+        res.send(allApplications);
+      } catch (error) {
+        console.error("Error fetching all applications:", error);
+        res.status(500).send({ message: "Failed to fetch all applications." });
+      }
+    });
+
+    app.get("/applications/all", async (req, res) => {
+      try {
+        // Kono query/filter nei, shob data fetch hobe
+        const applications = await applicationsCollection.find().toArray();
+
+        res.send(applications);
+      } catch (error) {
+        console.error("Error fetching all applications:", error);
+        res
+          .status(500)
+          .send({ message: "Failed to fetch all applications from server." });
       }
     });
 
