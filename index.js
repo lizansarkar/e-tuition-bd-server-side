@@ -113,6 +113,32 @@ async function run() {
       }
     });
 
+    // email diye role chek kora hocce
+    app.get("/users/:email/role", async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        const userCollection = client
+          .db("e-tuition-bd-db")
+          .collection("users");
+
+        const user = await userCollection.findOne(
+          { email: email },
+          { projection: { role: 1, _id: 0 } }
+        );
+
+        if (!user) {
+          return res.status(404).send({ role: "Guest" });
+        }
+
+        // Shothik user role return kora holo
+        res.send({ role: user.role });
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
     //*****************  Admin realeted api  ******************
     // 1. GET: Fetch ALL Users for Admin Management
     app.get("/admin/users", async (req, res) => {
@@ -356,7 +382,7 @@ async function run() {
       }
     });
 
-    // applicationsCollection theke akta data ane tutor aplied korbe
+    // applicationsCollection theke akta data ane tutor aplied korbe mane tutor aplication korbe akhan theke
     app.post("/applications", async (req, res) => {
       const application = req.body;
       const { tuitionId, tutorEmail } = application;
