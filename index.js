@@ -58,6 +58,7 @@ async function run() {
     //   }
     // };
 
+    // login kora Frontend theke pawa data database set kora hocce
     app.post("/users", async (req, res) => {
       // Frontend theke pawa data
       const user = req.body;
@@ -112,7 +113,7 @@ async function run() {
       }
     });
 
-    //admin realeted all api niche
+    //*****************  Admin realeted api  ******************
     // 1. GET: Fetch ALL Users for Admin Management
     app.get("/admin/users", async (req, res) => {
       try {
@@ -313,7 +314,8 @@ async function run() {
       }
     });
 
-    //tuition realeted api niche
+    // ************** student related api niche *****************
+    //aijayga theke all aproved tuition data niye all tuitions page a dekhano hocce
     app.get("/all-approved-tuitions", async (req, res) => {
       try {
         // Query to fetch only posts approved by Admin
@@ -335,12 +337,80 @@ async function run() {
       }
     });
 
-    //post new tuition post data
+    //aijayga theke single tuition post details anbo
+    app.get("/all-tuition/:id", async (req, res) => {
+      const postId = req.params.id;
+      try {
+        const query = { _id: new ObjectId(postId), status: "Approved" };
+        const tuitionPost = await tuitionPostsCollection.findOne(query);
+
+        if (!tuitionPost) {
+          return res
+            .status(404)
+            .send({ message: "Tuition post not found or not approved." });
+        }
+        res.send(tuitionPost);
+      } catch (error) {
+        console.error("Error fetching tuition post:", error);
+        res.status(500).send({ message: "Failed to fetch post details" });
+      }
+    });
+
+    // applicationsCollection theke akta data ane tutor aplied korbe
+    app.post("/applications", async (req, res) => {
+      const application = req.body;
+      const { tuitionId, tutorEmail } = application;
+
+      if (!tuitionId || !tutorEmail) {
+        return res.status(400).send({
+          message: "Missing required fields: tuitionId or tutorEmail",
+        });
+      }
+
+      try {
+        // 1. Check if the tutor has already applied to this post
+        const existingApplication = await applicationsCollection.findOne({
+          tuitionId: tuitionId,
+          tutorEmail: tutorEmail,
+        });
+
+        if (existingApplication) {
+          // Already applied error
+          return res.status(409).send({
+            message: "You have already applied for this tuition post.",
+          });
+        }
+
+        // 2. Prepare and save the application data
+        const newApplication = {
+          ...application,
+          // Ensure ID is ObjectId if needed later, but here we keep it as string from frontend
+          tuitionId: tuitionId,
+          tuitionObjectId: new ObjectId(tuitionId), // ObjectId of the original post for indexing/lookup
+          status: "Pending", // Status is always Pending on submission
+          appliedAt: new Date(),
+        };
+
+        const result = await applicationsCollection.insertOne(newApplication);
+
+        res.status(201).send({
+          message: "Application successfully submitted!",
+          insertedId: result.insertedId,
+        });
+      } catch (error) {
+        console.error("Error submitting application:", error);
+        res.status(500).send({
+          message: "Failed to submit application",
+          error: error.message,
+        });
+      }
+    });
+
+    //post new tuition aijaygay net tuition post kora hobe
     app.post("/post-new-tuition", async (req, res) => {
       try {
         const tuitionPost = req.body;
 
-        // 1. Data Validation (Optional but Recommended)
         if (
           !tuitionPost.subject ||
           !tuitionPost.location ||
@@ -349,14 +419,12 @@ async function run() {
           return res.status(400).send({ message: "Missing required fields" });
         }
 
-        // 2. Add necessary server-side fields
+        // server-side fields
         tuitionPost.createdAt = new Date();
-        tuitionPost.status = "Pending"; // Initial status for admin review
+        tuitionPost.status = "Pending";
 
-        // 3. Save to MongoDB
         const result = await tuitionPostsCollection.insertOne(tuitionPost);
 
-        // 4. Send success response with inserted ID
         res.status(201).send({
           insertedId: result.insertedId,
           message: "Tuition post created successfully and is pending approval.",
@@ -370,7 +438,7 @@ async function run() {
       }
     });
 
-    //get tuition post data
+    // get tuition post data
     app.get("/tuition-posts", async (req, res) => {
       try {
         const { email } = req.query;
@@ -425,7 +493,7 @@ async function run() {
       }
     });
 
-    //tutor dashboard api
+    //************** tutor realeted api *****************
     app.post("/applications", async (req, res) => {
       try {
         const applicationData = req.body; // Mandatory data check (should come from frontend modal)
