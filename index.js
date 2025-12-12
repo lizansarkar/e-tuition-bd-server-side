@@ -564,6 +564,24 @@ async function run() {
       }
     });
 
+    app.get("/applications/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const application = await applicationsCollection.findOne(query);
+        if (!application) {
+          return res
+
+            .status(404)
+            .send({ message: "Application not found with the provided ID." });
+        }
+        res.send(application);
+      } catch (error) {
+        console.error("Error fetching application:", error);
+        res.status(500).send({ message: "Failed to fetch application." });
+      }
+    });
+
     // get tutor data with email diye
     app.get("/tutor/applications/:email", async (req, res) => {
       try {
@@ -682,13 +700,28 @@ async function run() {
     });
     
 
+    app.get("/tutor/:id", async (req, res) => {
+      const id = req.params.id;
+      try {
+        const query = { _id: new ObjectId(id) };
+        const result = await applicationsCollection.findOne(query);
+        if (!result) {
+          return res.status(404).send({ message: "Tutor profile not found." });
+        }
+        res.send(result);
+      }
+      catch (error) {
+        console.error("Error fetching tutor profile:", error);
+        res.status(500).send({ message: "Failed to fetch tutor profile." });
+      }
+    });
 
     //payment realeted api
     app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
       const amount = paymentInfo.amount;
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
+        // payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
@@ -696,8 +729,8 @@ async function run() {
               product_data: {
                 name: "E Tuition Payment",
               },
-              // unit_amount: amount * 100,
-              unit_amount: 1500,
+              unit_amount: amount * 100,
+              // unit_amount: amount,
             },
             quantity: 1,
           },
@@ -705,8 +738,9 @@ async function run() {
         customer_email: paymentInfo.email,
         mode: "payment",
         success_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-success`,
-        cancel_url: paymentInfo.cancel_url,
+        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-cancelled`,
       });
+      console.log(session);
       res.send({ url: session.url });
     });
 
