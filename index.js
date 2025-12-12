@@ -3,8 +3,8 @@ const cors = require("cors");
 const app = express();
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-// stripe requre key
-// const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+// stripe require key
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 3000;
 
@@ -623,7 +623,7 @@ async function run() {
       }
     });
 
-    
+
     //uptate tutor data akhan theke
     app.patch("/applications/:id", async (req, res) => {
       try {
@@ -679,6 +679,35 @@ async function run() {
         console.error("Error deleting application:", error);
         res.status(500).send({ message: "Failed to delete application." });
       }
+    });
+    
+
+
+    //payment realeted api
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = paymentInfo.amount;
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "E Tuition Payment",
+              },
+              // unit_amount: amount * 100,
+              unit_amount: 1500,
+            },
+            quantity: 1,
+          },
+        ],
+        customer_email: paymentInfo.email,
+        mode: "payment",
+        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-success`,
+        cancel_url: paymentInfo.cancel_url,
+      });
+      res.send({ url: session.url });
     });
 
     // Send a ping to confirm a successful connection
