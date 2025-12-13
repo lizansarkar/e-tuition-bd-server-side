@@ -627,21 +627,6 @@ async function run() {
       }
     });
 
-    app.get("/applications/all", async (req, res) => {
-      try {
-        // Kono query/filter nei, shob data fetch hobe
-        const applications = await applicationsCollection.find().toArray();
-
-        res.send(applications);
-      } catch (error) {
-        console.error("Error fetching all applications:", error);
-        res
-          .status(500)
-          .send({ message: "Failed to fetch all applications from server." });
-      }
-    });
-
-
     //uptate tutor data akhan theke
     app.patch("/applications/:id", async (req, res) => {
       try {
@@ -719,7 +704,7 @@ async function run() {
     //payment realeted api
     app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
-      const amount = paymentInfo.amount;
+      const amount = paymentInfo.expectedSalary;
       const session = await stripe.checkout.sessions.create({
         // payment_method_types: ["card"],
         line_items: [
@@ -735,10 +720,10 @@ async function run() {
             quantity: 1,
           },
         ],
-        customer_email: paymentInfo.email,
+        customer_email: paymentInfo.tutorEmail,
         mode: "payment",
-        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-success`,
-        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/payment-cancelled`,
+        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-success`,
+        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-candelled`,
       });
       console.log(session);
       res.send({ url: session.url });
