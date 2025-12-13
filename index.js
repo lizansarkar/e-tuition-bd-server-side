@@ -683,7 +683,6 @@ async function run() {
         res.status(500).send({ message: "Failed to delete application." });
       }
     });
-    
 
     app.get("/tutor/:id", async (req, res) => {
       const id = req.params.id;
@@ -694,14 +693,24 @@ async function run() {
           return res.status(404).send({ message: "Tutor profile not found." });
         }
         res.send(result);
-      }
-      catch (error) {
+      } catch (error) {
         console.error("Error fetching tutor profile:", error);
         res.status(500).send({ message: "Failed to fetch tutor profile." });
       }
     });
 
     //payment realeted api
+    app.post("/payments", async (req, res) => {
+      try {
+        const paymentData = req.body;
+        const result = await paymentsCollection.insertOne(paymentData);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error("Error recording payment:", error);
+        res.status(500).send({ message: "Failed to record payment." });
+      }
+    });
+
     app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
       const amount = paymentInfo.expectedSalary;
@@ -726,13 +735,41 @@ async function run() {
           studentEmail: paymentInfo.studentEmail,
           tuitionId: paymentInfo.tuitionId,
         },
-        
+
         customer_email: paymentInfo.tutorEmail,
         success_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-cancelled`,
       });
       console.log(session);
       res.send({ url: session.url });
+    });
+
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      console.log("session retrive", session);
+      if (session.payment_status !== "paid") {
+        return res.status(400).send({ message: "Payment not completed." });
+      }
+      const id = session.metadata.tuitionId;
+      const query = { tuitionId: id };
+      const updateDoc = {
+        $set: {
+          paymentStatus: "Paid",
+          paymentDate: new Date(),
+        },
+      };
+      await paymentsCollection.insertOne({
+        tutorEmail: session.metadata.tutorEmail,
+        studentEmail: session.metadata.studentEmail,
+        tuitionId: session.metadata.tuitionId,
+        amount: session.amount_total / 100,
+        paymentDate: new Date(),
+      });
+      await applicationsCollection.updateOne(query, updateDoc);
+      console.log(query)
+
+      res.send({ success: true });
     });
 
     // Send a ping to confirm a successful connection
