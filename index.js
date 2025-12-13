@@ -720,10 +720,16 @@ async function run() {
             quantity: 1,
           },
         ],
-        customer_email: paymentInfo.tutorEmail,
         mode: "payment",
-        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-success`,
-        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-candelled`,
+        metadata: {
+          tutorEmail: paymentInfo.tutorEmail,
+          studentEmail: paymentInfo.studentEmail,
+          tuitionId: paymentInfo.tuitionId,
+        },
+        
+        customer_email: paymentInfo.tutorEmail,
+        success_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.STRIPE_DOMAIN}/dashboard/student/payment-cancelled`,
       });
       console.log(session);
       res.send({ url: session.url });
