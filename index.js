@@ -11,7 +11,9 @@ const crypto = require("crypto");
 
 const admin = require("firebase-admin");
 
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
 const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
@@ -76,11 +78,7 @@ async function run() {
     const paymentsCollection = db.collection("payments");
     const tuitionPostsCollection = db.collection("tuitionPosts");
     const applicationsCollection = db.collection("applications");
-
-    // const teacherProfilesCollection = db.collection("teacherProfiles");
-    // const bookingsCollection = db.collection("bookings");
-    // const reviewsCollection = db.collection("reviews");
-    // const coursesCollection = db.collection("courses");
+    const contactsCollection = db.collection("contacts");
 
     //aita firebase token use korar por babohar kora uchit
     const verifyAdmin = async (req, res, next) => {
@@ -185,7 +183,7 @@ async function run() {
       const query = { email };
       console.log(query);
       const user = await usersCollection.findOne(query);
-      res.send({ role: user?.role || "user" });
+      res.send({ role: user?.role || "student" });
     });
 
     // 1. Fetch User Profile API (GET)
@@ -239,6 +237,27 @@ async function run() {
       } catch (error) {
         console.error("Error updating user profile:", error);
         res.status(500).send({ message: "Failed to update profile." });
+      }
+    });
+
+    //aita ami recent update korechi tai akhane
+    app.post("/contacts", async (req, res) => {
+      try {
+        const contactData = req.body;
+
+        const result = await contactsCollection.insertOne({
+          ...contactData,
+          submittedAt: new Date(),
+        });
+
+        res.status(201).send({
+          success: true,
+          message: "Message sent successfully!",
+          insertedId: result.insertedId,
+        });
+      } catch (error) {
+        console.error("Contact post error:", error);
+        res.status(500).send({ message: "Internal Server Error" });
       }
     });
 
