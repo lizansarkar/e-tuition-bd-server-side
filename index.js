@@ -12,7 +12,7 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
-  "utf8"
+  "utf8",
 );
 const serviceAccount = JSON.parse(decoded);
 
@@ -220,7 +220,7 @@ async function run() {
 
         const result = await usersCollection.updateOne(
           { email: email },
-          updateDoc
+          updateDoc,
         );
 
         if (result.modifiedCount === 0) {
@@ -321,7 +321,7 @@ async function run() {
           .toArray();
         const totalEarnings = totalEarningsArray.reduce(
           (sum, payment) => sum + (payment.amount || 0),
-          0
+          0,
         );
 
         res.send({
@@ -428,7 +428,7 @@ async function run() {
 
         const result = await tuitionPostsCollection.updateOne(
           idQuery,
-          updateDoc
+          updateDoc,
         );
 
         if (result.matchedCount === 0) {
@@ -478,7 +478,7 @@ async function run() {
           console.error("Error updating user role:", error);
           res.status(500).send({ message: "Failed to update user role." });
         }
-      }
+      },
     );
 
     // Purpose: User account delete kora
@@ -525,22 +525,35 @@ async function run() {
     //aijayga theke all aproved tuition data niye all tuitions page a dekhano hocce
     app.get("/all-approved-tuitions", async (req, res) => {
       try {
-        // Query to fetch only posts approved by Admin
-        const query = { status: "Approved" };
+        // ১. কুয়েরি প্যারামিটার রিসিভ করা
+        const page = parseInt(req.query.page) || 0;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = page * limit;
 
-        const options = {
-          sort: { createdAt: -1 },
-        };
+        // ২. কুয়েরি ফিল্টার (Regex ব্যবহার করছি যাতে Approved/approved সব পায়)
+        const query = { status: { $regex: /^approved$/i } };
 
-        const cursor = tuitionPostsCollection.find(query, options);
-        const result = await cursor.toArray();
+        // ৩. ডাটাবেস থেকে ডেটা আনা
+        const result = await tuitionPostsCollection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .toArray();
 
-        res.send(result);
+        // ৪. টোটাল কয়টি ডেটা আছে তা বের করা
+        const totalCount = await tuitionPostsCollection.countDocuments(query);
+
+        // ৫. ফ্রন্টএন্ডে অবজেক্ট আকারে পাঠানো
+        res.send({
+          tuitions: result || [],
+          totalCount: totalCount || 0,
+        });
       } catch (error) {
-        console.error("Error fetching all approved tuition posts:", error);
+        console.error("Backend error at /all-approved-tuitions:", error);
         res
           .status(500)
-          .send({ message: "Failed to fetch approved tuition posts." });
+          .send({ message: "Internal Server Error", error: error.message });
       }
     });
 
@@ -764,7 +777,7 @@ async function run() {
 
         await tuitionPostsCollection.updateOne(
           { _id: new ObjectId(applicationData.tuitionId) },
-          { $inc: { appliedTutorsCount: 1 } } // Assuming you have 'appliedTutorsCount' field
+          { $inc: { appliedTutorsCount: 1 } }, // Assuming you have 'appliedTutorsCount' field
         );
 
         res.status(201).send(result);
@@ -826,7 +839,7 @@ async function run() {
               _id: new ObjectId(app.tuitionId),
             });
             return { ...app, tuitionDetails: tuitionPost || null };
-          })
+          }),
         );
 
         res.send(applicationDetails);
@@ -969,7 +982,7 @@ async function run() {
         if (payments.length > 0) {
           totalRevenue = payments.reduce(
             (sum, payment) => sum + (payment.amount || 0),
-            0
+            0,
           );
         }
 
@@ -1106,7 +1119,7 @@ async function run() {
         };
         const updateResult = await applicationsCollection.updateOne(
           query,
-          updateDoc
+          updateDoc,
         );
         console.log("Application Status Updated:", updateResult.modifiedCount);
 
