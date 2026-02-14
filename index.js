@@ -73,12 +73,19 @@ async function run() {
     //create database in mongodb
     const db = client.db("e-tuition-bd-db");
 
-    // Collections
+    // *************** Collections *****************
+    //user ar data ai collection a save hobe
     const usersCollection = db.collection("users");
+    //payment ar data ai collection a save hobe
     const paymentsCollection = db.collection("payments");
+    //student tuition post ar data ai collection a save hobe
     const tuitionPostsCollection = db.collection("tuitionPosts");
+    //tutor application ar data ai collection a save hobe
     const applicationsCollection = db.collection("applications");
+    //contact componenter data ai collection a save hobe
     const contactsCollection = db.collection("contacts");
+    //all tutor ar data ai collection a save hobe
+    const tutorsCollection = db.collection("all-tutors");
 
     //aita firebase token use korar por babohar kora uchit
     const verifyAdmin = async (req, res, next) => {
@@ -556,6 +563,50 @@ async function run() {
           .send({ message: "Internal Server Error", error: error.message });
       }
     });
+
+    //aijayga theke all aproved tutor data niye all tuitions page a dekhano hocce
+app.get("/all-approved-tutors", async (req, res) => {
+  try {
+    // ১. কুয়েরি প্যারামিটার থেকে ডাটা নেওয়া (search ডিফাইন করা হলো)
+    const page = parseInt(req.query.page) || 0;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || ""; // এই লাইনটি মিসিং ছিল ভাই!
+    const skip = page * limit;
+
+    // ২. কুয়েরি ফিল্টার (স্ট্যাটাস approved এবং সার্চ সাপোর্ট)
+    const query = { 
+      status: { $regex: /^approved$/i } 
+    };
+
+    // যদি সার্চ বক্সে কিছু লেখে, তবেই কুয়েরিতে সার্চ অপশন যোগ হবে
+    if (search) {
+      query.$or = [
+        { subject: { $regex: search, $options: "i" } },
+        { location: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    // ৩. ডাটাবেস থেকে ডেটা আনা
+    const result = await tutorsCollection
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    // ৪. টোটাল কয়টি আছে বের করা
+    const totalCount = await tutorsCollection.countDocuments(query);
+
+    // ৫. রেসপন্স পাঠানো
+    res.send({
+      tutors: result || [],
+      totalCount: totalCount || 0,
+    });
+  } catch (error) {
+    console.error("Backend error at /all-approved-tutors:", error);
+    res.status(500).send({ message: "Internal Server Error", error: error.message });
+  }
+});
 
     //aijayga theke single tuition post details anbo
     app.get("/all-tuition/:id", async (req, res) => {
